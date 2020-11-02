@@ -39,7 +39,7 @@ Key findings
 (-) In 2018, the price shows a donward trend in the beginning, but resumes in November and reaches a peak in December (potential reason: Thanksgiving, Christmas and New Year).
 (-) In 2019, the listing price shows an upward trend. 
 (-) In 2020, the listing price drops in the beginning (potential reason: covid-19); however, starting from May, the price resumes and increases. 
-(-) Weekly seasonality is shown in the data. Since we only have two years data, it is hard to tell if there is a monthly seasonality. 
+(-) Weekly seasonality is shown in the data. Since we only have two years data, it is hard to tell if there is a yearly seasonality. 
 
 (2.) Explore a variety of time-series models and determine the most appropriate candidate  model on the basis of accuracy and simplicity to analyze and forecast future prices. 
 
