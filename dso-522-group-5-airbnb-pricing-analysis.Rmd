@@ -1,0 +1,66 @@
+---
+title: "DSO 522 Group 5 Airbnb Pricing Analysis"
+author: "Group 5 (Evelyn (Wanyi) Dong, Qiongqiong Lin, Jenny Shang, Yoki (Lingrou) Wang) "
+date: "11/1/2020"
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+header-includes: \usepackage{color}
+---
+
+\begin{center} 
+{\color{red} \textbf{DSO 522 Group 5 Airbnb Pricing Analysis}}
+\end{center}
+
+For this project, we want to study the impact of Covid-19 on the tourism industry by
+analyzing past price trends of Airbnb rental properties in the city of Oakland, California, and predict future rental prices by applying different time-series forecasting methods. We choose this topic because Airbnb rentals have seen significant growth in the past but are now struggling from booking declines due to Covid-19. We are interested in using time-series forecasting to predict future prices and provide valuable insights and recommendations to help Airbnb’s stakeholders develop a solid pricing strategy to achieve customer retention and sustainable growth. From a technical standpoint, Airbnb data is readily available on Airbnb’s official website (http://insideairbnb.com/get-the-data.html). It is pre-processed, well-structured and standardized, making it the ideal dataset to conduct our analysis.
+
+The complete dataset represents 722 Oakland average daily Airbnb house pricing from July 16, 2018 to July 16, 2020. 
+
+## Our analysis is built on three key objectives: 
+(1.) Understand the historical patterns of the Airbnb data by studying potential trends and  periodic components. 
+```{r}
+# import packages
+library(zoo)
+```
+
+```{r}
+# read data
+data = read.csv("cleaned_data.csv")
+# set zoo object of price
+price = zoo(data$price, seq(from = as.Date("2018-07-16"), to = as.Date("2020-07-16"), by = 1))
+# plot the data
+autoplot(price) + xlab("Time") + ylab("Average listing price") 
+```
+
+Key findings 
+(-) The pricing data shows more variability in 2018 and 2020 than 2019. 
+(-) In 2018, the price shows a donward trend in the beginning, but resumes in November and reaches a peak in December (potential reason: Thanksgiving, Christmas and New Year).
+(-) In 2019, the listing price shows an upward trend. 
+(-) In 2020, the listing price drops in the beginning (potential reason: covid-19); however, starting from May, the price resumes and increases. 
+(-) Weekly seasonality is shown in the data. Since we only have two years data, it is hard to tell if there is a monthly seasonality. 
+
+(2.) Explore a variety of time-series models and determine the most appropriate candidate  model on the basis of accuracy and simplicity to analyze and forecast future prices. 
+
+(-) 
+```{r}
+
+```
+
+(3.) Implement the selected candidate model to forecast both short-term and long-term Airbnb  average listing price in Oakland, California. 
+
+## With our objectives in mind, we strive to deliver to Airbnb stakeholders a guidance on listing  price. Our analysis will focus on answering four important questions: 
+
+(1.) What are the  determinative factors of average listing prices? 
+
+(2.) Are there any lags between Covid-19 outbreak  and rental prices? 
+
+(3.) Have vacation rentals recovered from the pandemic? 
+
+(4.) Are there any  important external factors that play a role in determining the average listing price? In the future, we can apply our analysis to broader geographic areas. 
+
+Some important variables in our study include the overall average listing price of the  selected city, and the average listing price per room type (entire home/apt or private room).  Additional variables we want to consider include the city’s unemployment rate over time, which  can be found on the U.S. Bureau of Labor Statistics website (https://www.bls.gov), as well as  general economic indicators such as GDP growth, which can be obtained from St. Louis Fed  (https://fred.stlouisfed.org/). 
+
+At the end of our study, we expect to draw critical insights from historical patterns in  order to assist Airbnb’s stakeholders. We aim to provide Airbnb hosts with an understanding of  the determinative factors affecting property listing price such that they can adjust ahead of time,  suggest an accurate, simple and effective time-series forecasting model for Airbnb to predict  average short-term rental pricing and long-term rental pricing, and explore potential solutions for  Airbnb to identify risks and launch effective promotion or recovery plans in this Covid-19 era.
+
