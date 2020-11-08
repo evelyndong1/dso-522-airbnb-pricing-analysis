@@ -26,13 +26,50 @@ library(zoo)
 ```
 
 ```{r}
+library(forecast)
 # read data
 data = read.csv("cleaned_data.csv")
 # set zoo object of price
 price = zoo(data$price, seq(from = as.Date("2018-07-16"), to = as.Date("2020-07-16"), by = 1))
 # plot the data
-autoplot(price) + xlab("Time") + ylab("Average listing price") 
+autoplot(price, xlab=("Time") , ylab=("Average listing price") )
 ```
+
+```{r Loading Data in TS format}
+library(forecast)
+
+price.ts = ts(data$price, start = c(2018,199), frequency=365)
+ma.trailing.roll.week = rollmean(price.ts, k = 7, align = "right")
+ma.trailing.roll.month = rollmean(price.ts, k = 30, align = "right")
+
+
+# plot the data
+autoplot(price.ts,main='Airbnb Oakland Daily Pricing', 
+         xlab=("Time") , ylab=("Average listing price") )+
+  autolayer(ma.trailing.roll.week,series='Weekly Aggregated')+
+  autolayer(ma.trailing.roll.month,series='Monthly Aggregated')
+  
+```
+
+
+```{r Smoothing}
+changeofprice = read.csv("Change_of_Price.csv")
+changeofprice <- ts(changeofprice$X..Change,start=c(2018,199),frequency=365)
+autoplot(changeofprice,main='Change of Price Lag 1',ylab='% of Change in Price')
+
+library(lmtest)
+#AR(1)
+ar1<-Arima(changeofprice,order=c(1,0,0))
+coeftest(ar1)
+
+```
+
+We see that the coefficient is far away from 0 and P value also did not show statistical significance, which means this is not a random walk.
+
+
+
+
+
 
 Key findings 
 (-) The pricing data shows more variability in 2018 and 2020 than 2019. 
