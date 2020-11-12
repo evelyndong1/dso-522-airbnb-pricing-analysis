@@ -51,6 +51,18 @@ autoplot(price.ts,main='Airbnb Oakland Daily Pricing',
   
 ```
 
+1. Ask for advice on predicting daily v.s. monthly price of Oakland (monthly with very limited data points but does have monthly alternative data available)
+Depends on the scope of what we wanted to use them for.
+Using alternative data that's not on the same level of details - extrapolation issue - check to see what are their performances.
+
+
+** Look into why 2019 sharp drop
+** Qualitative external variable : use dummy variable to indicate those exceptional cases?
+2. Ask for clarification on COVID impact on model buildling - seperate models for post COVID?
+By looking at the data we seee a sharper decrease in 2019 compare with COVID's impact:
+* Build the model without 2020, and then make predictions in 2020
+
+
 
 ```{r Smoothing}
 changeofprice = read.csv("Change_of_Price.csv")
