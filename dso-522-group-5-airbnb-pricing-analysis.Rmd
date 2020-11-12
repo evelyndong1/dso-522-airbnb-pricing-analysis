@@ -38,7 +38,7 @@ autoplot(price, xlab=("Time") , ylab=("Average listing price") )
 ```{r Loading Data in TS format}
 library(forecast)
 
-price.ts = ts(data$price, start = c(2018,199), frequency=365)
+price.ts = ts(data$price, start = c(2018,197), frequency=365)
 ma.trailing.roll.week = rollmean(price.ts, k = 7, align = "right")
 ma.trailing.roll.month = rollmean(price.ts, k = 30, align = "right")
 
@@ -66,7 +66,7 @@ By looking at the data we seee a sharper decrease in 2019 compare with COVID's i
 
 ```{r Smoothing}
 changeofprice = read.csv("Change_of_Price.csv")
-changeofprice <- ts(changeofprice$X..Change,start=c(2018,199),frequency=365)
+changeofprice <- ts(changeofprice$X..Change,start=c(2018,198),frequency=365)
 autoplot(changeofprice,main='Change of Price Lag 1',ylab='% of Change in Price')
 
 library(lmtest)
