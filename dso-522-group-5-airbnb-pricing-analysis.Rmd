@@ -46,13 +46,9 @@ https://robjhyndman.com/hyndsight/seasonal-periods/
 <<<<<<< HEAD
 ```{r Loading Data in TS format}
 price.ts = ts(data$price, start = c(2018,1), frequency=7)
-=======
-price.ts = ts(data$price, start = c(2018,197), frequency=365)
->>>>>>> 14a167ba2c61798a887a32bcdc9ad4a6a3c92a05
+#price.ts = ts(data$price, start = c(2018,197), frequency=365)
 ma.trailing.roll.week = rollmean(price.ts, k = 7, align = "right")
 ma.trailing.roll.month = rollmean(price.ts, k = 30, align = "right")
-
-
 # plot the data
 autoplot(price.ts,main='Airbnb Oakland Daily Pricing', 
          xlab=("Time") , ylab=("Average listing price") )+
@@ -72,8 +68,7 @@ Using alternative data that's not on the same level of details - extrapolation i
 By looking at the data we seee a sharper decrease in 2019 compare with COVID's impact:
 * Build the model without 2020, and then make predictions in 2020
 
-
-
+- Exponential Smoothing 
 ```{r Smoothing}
 changeofprice = read.csv("Change_of_Price.csv")
 changeofprice <- ts(changeofprice$X..Change,start=c(2018,198),frequency=365)
@@ -83,11 +78,80 @@ library(lmtest)
 #AR(1)
 ar1<-Arima(changeofprice,order=c(1,0,0))
 coeftest(ar1)
-
 ```
 
 We see that the coefficient is far away from 0 and P value also did not show statistical significance, which means this is not a random walk.
 
+- ARIMA
+Clearly there is a trend in the time series, which makes the time series non-stationary. As a result, we take a first-order differencing and check ACF and PACF graphs. 
+```{r}
+# check detrended price
+price.detrend = diff(price.ts, lag = 1)
+autoplot(price.detrend)
+par(mfrow=c(1,2)) 
+Acf(price.detrend, 150) 
+Pacf(price.detrend, 150)
+par(mfrow=c(1,1)) 
+```
+From the ACF and PACF graphs of detrended data, we can see the PACF graph cuts off and ACF graph slowly tails off. However, since the ACF graph has spikes in seasonal lags and doesn't converge to 0, this suggests a weekly seasonality pattern in the data. These also appear to be non-stationary, so we take an additional weekly difference. 
+
+```{r}
+# check detrended and deseasoned price 
+price.detrend.deseason = diff(diff(price.ts, lag = 1), lag=7)
+autoplot(price.detrend.deseason)
+par(mfrow=c(1,2)) 
+Acf(price.detrend.deseason, 150) 
+Pacf(price.detrend.deseason, 150)
+par(mfrow=c(1,1)) 
+```
+Our aim now is to find an appropriate ARIMA model baseds on the ACF and PACF graph show agove. The significant spike at lag 1 and no significant spikes immediately followed after lag 1 in the ACF suggests a non-seasonal MA(1) component, and the signiifcant spike at lag 7 in the ACF suggests a seasonal MA(1) component. Consequently, we begin with a SARIMA(0,1,1)(0,1,1)[7] model, indicating a first and seasonal difference, and non-seasonal and seasonal MA(1) components.
+
+By analogous logic applied to the PACF, there is a significant spike in lag 1, followed by an almost significant spike at lag 2, which doesn't indicate a non-seasonal AR term that we are interested in. The significant pike at lag 7 in the PACF suggest a seasonal AR(1) component. As a result, we could have another SARIMA(0,1,0)(1,1,0)[7] model. 
+
+By combining the AR and MA terms together, we could have a third SARIMA(0,1,1)(1,1,1)[7] model, and a fourth SARIMA(1,1,1)(1,1,1) to validate our assumption about the AR term. 
+
+Finally, we try an AutoArima model to search over possible models.
+
+(1) SARIMA(0,1,1)(0,1,1)[7]
+```{r}
+arima1 = Arima(price.ts, order=c(0,1,1), seasonal = list(order=c(0,1,1), period=7))
+summary(arima1)
+```
+(2) SARIMA(0,1,0)(1,1,0)[7]
+```{r}
+arima2 = Arima(price.ts, order=c(0,1,0), seasonal = list(order=c(1,1,0), period=7))
+summary(arima2)
+```
+
+(3) SARIMA(0,1,0)(1,1,1)[7]
+```{r}
+arima3 = Arima(price.ts, order=c(0,1,0), seasonal = list(order=c(1,1,1), period=7))
+summary(arima3)
+```
+
+(4) SARIMA(1,1,1)(1,1,1)[7]
+```{r}
+arima4 = Arima(price.ts, order=c(1,1,1), seasonal = list(order=c(1,1,1), period=7))
+summary(arima4)
+```
+
+(5) Auto ARIMA
+```{r}
+arima5 = auto.arima(price.ts, seasonal=TRUE, approximation = FALSE)
+summary(arima5)
+```
+
+Based on the MAPE values, the best model is the third model - SARIMA(0,1,0)(1,1,1)[7]. However, it still gives a high MAPE value of 0.6184103, which indicates the predicted sales is 0.62% off the target (pretty accurate for in-sample data). By checking residuals, we find the model doesn't fit well for time before 2019 and after covid-19. As a result, our next step is to 1) partition the data into three parts and fit models accordingly 2) partition into training and validation set to check model robustness. 
+
+(Why Auto-Arima doesn't work: https://stackoverflow.com/questions/52976059/auto-arima-in-r-error-no-seasonal-differencing-is-selected)
+```{r}
+mape(price.ts, m3$fitted)
+```
+
+```{r}
+autoplot(price.ts)+autolayer(m3$fitted)
+checkresiduals(m3)
+```
 
 
 
