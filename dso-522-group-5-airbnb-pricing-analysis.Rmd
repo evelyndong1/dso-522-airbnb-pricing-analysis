@@ -322,7 +322,7 @@ mape(price.ts, m3$fitted)
 autoplot(price.ts)+autolayer(m3$fitted)
 checkresiduals(m3)
 ```
-**Model 3 - Neural Network Autoregression Model **
+**Model 3 - Neural Network Autoregression Model**
 
 ```{r}
 price.ts = ts(data$price, start = c(2018,197), frequency=365)
@@ -370,9 +370,7 @@ autoplot(m2.pred)+autolayer(post.covid)+autolayer(m2$fitted)
 
 ```{r}
 ## Model 3 NNAR with exogenous variable-ur
-
 m3<-nnetar(pre.covid,xreg = as.matrix(ur.xreg$ur.xts))
-
 m3.pred<-forecast(m3,h=nValid,xreg=as.matrix(ur.valid))
 accuracy(m3.pred,post.covid)
 ```
@@ -394,7 +392,6 @@ accuracy(m4.pred,post.covid)
 ```{r}
 autoplot(m4.pred)+autolayer(post.covid)+autolayer(m4$fitted)
 ```
-
 
 ```{r}
 library(forecast)
