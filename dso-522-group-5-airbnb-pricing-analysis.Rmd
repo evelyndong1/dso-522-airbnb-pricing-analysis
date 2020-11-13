@@ -322,6 +322,102 @@ mape(price.ts, m3$fitted)
 autoplot(price.ts)+autolayer(m3$fitted)
 checkresiduals(m3)
 ```
+**Model 3 - Neural Network Autoregression Model **
+
+```{r}
+price.ts = ts(data$price, start = c(2018,197), frequency=365)
+library(xts)
+library(readxl)
+pre.covid<-window(price.ts,start=c(2018,197),end=c(2019,365),frequency=365)
+post.covid<-window(price.ts,start=c(2020,1),frequency=365)
+nValid=197
+GDP<-read_xlsx("GDP.xlsm")
+gdp.xts <- xts(GDP$GDP,order.by=as.Date(GDP$DATE))
+gdp.daily<-na.locf(merge(gdp.xts, foo=zoo(NA, order.by=seq(start(gdp.xts), end(gdp.xts),
+  "day",drop=F)))[, 1])
+gdp.xreg<-gdp.daily[16:549,1]
+gdp.valid<-rep(last(gdp.xreg),nValid)
+ur<-read.csv("unemployment_rate.csv")
+ur.xts <- xts(ur$UNRATE,order.by=as.Date(ur$DATE))
+ur.daily<-na.locf(merge(ur.xts, foo=zoo(NA, order.by=seq(start(ur.xts), end(ur.xts),
+  "day",drop=F)))[, 1])
+ur.xreg<-ur.daily[16:549,1]
+ur.valid<-rep(last(ur.xreg),nValid)
+```
+
+```{r}
+# Model 1 original NNAR
+set.seed(100)
+m1<-nnetar(pre.covid)
+m1.pred<-forecast(m1,h=nValid)
+accuracy(m1.pred,post.covid)
+```
+
+```{r}
+autoplot(m1.pred)+autolayer(post.covid)+autolayer(m1$fitted)
+```
+
+```{r}
+## Model 2 NNAR with exogenous variable-GDP
+m2<-nnetar(pre.covid,xreg = as.matrix(gdp.xreg$gdp.xts))
+m2.pred<-forecast(m2,h=nValid,xreg=as.matrix(gdp.valid))
+accuracy(m2.pred,post.covid)
+```
+
+```{r}
+autoplot(m2.pred)+autolayer(post.covid)+autolayer(m2$fitted)
+```
+
+```{r}
+## Model 3 NNAR with exogenous variable-ur
+
+m3<-nnetar(pre.covid,xreg = as.matrix(ur.xreg$ur.xts))
+
+m3.pred<-forecast(m3,h=nValid,xreg=as.matrix(ur.valid))
+accuracy(m3.pred,post.covid)
+```
+
+```{r}
+autoplot(m3.pred)+autolayer(post.covid)+autolayer(m3$fitted)
+```
+
+```{r}
+## Model 4 NNAR with both of ur & GDP variables
+a<-cbind(ur.xreg$ur.xts,gdp.xreg$gdp.xts)
+
+m4<-nnetar(pre.covid,xreg=as.matrix(a))
+
+m4.pred<-forecast(m4,h=nValid,xreg=as.matrix(cbind(ur.valid,gdp.valid)))
+accuracy(m4.pred,post.covid)
+```
+
+```{r}
+autoplot(m4.pred)+autolayer(post.covid)+autolayer(m4$fitted)
+```
+
+
+```{r}
+library(forecast)
+par(mfrow=c(1,2))
+Acf(pre.covid)
+Pacf(pre.covid)
+```
+ACF tails off as a damped wave pattern, Pacf cuts off at lag 36.
+AR(36) p=36, P=1, k=15
+
+```{r}
+# Model 5 p=36,P=1 NNAR
+m5<-nnetar(pre.covid,p=36,P=1,repeats = 15)
+m5.pred<-forecast(m5,h=nValid)
+accuracy(m5.pred,post.covid)
+```
+
+```{r}
+autoplot(m5.pred)+autolayer(post.covid)+autolayer(m5$fitted)
+```
+M5 is overfitting. 
+M3 is the best NNAR model.
+
 
 (3.) Implement the selected candidate model to forecast both short-term and long-term Airbnb  average listing price in Oakland, California. 
 
