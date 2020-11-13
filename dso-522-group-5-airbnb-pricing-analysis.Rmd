@@ -7,6 +7,8 @@ output:
   html_document: default
   word_document: default
 header-includes: \usepackage{color}
+editor_options: 
+  chunk_output_type: console
 ---
 
 \begin{center} 
@@ -20,13 +22,16 @@ The complete dataset represents 722 Oakland average daily Airbnb house pricing f
 
 ## Our analysis is built on three key objectives: 
 (1.) Understand the historical patterns of the Airbnb data by studying potential trends and  periodic components. 
+
 ```{r}
 # import packages
 library(zoo)
+library(forecast)
+library(ggplot2)
+library(dplyr)
 ```
 
 ```{r}
-library(forecast)
 # read data
 data = read.csv("cleaned_data.csv")
 # set zoo object of price
@@ -35,10 +40,15 @@ price = zoo(data$price, seq(from = as.Date("2018-07-16"), to = as.Date("2020-07-
 autoplot(price, xlab=("Time") , ylab=("Average listing price") )
 ```
 
-```{r Loading Data in TS format}
-library(forecast)
+For example, data with daily observations might have a weekly seasonality (frequency=7) 
+https://robjhyndman.com/hyndsight/seasonal-periods/
 
+<<<<<<< HEAD
+```{r Loading Data in TS format}
+price.ts = ts(data$price, start = c(2018,1), frequency=7)
+=======
 price.ts = ts(data$price, start = c(2018,197), frequency=365)
+>>>>>>> 14a167ba2c61798a887a32bcdc9ad4a6a3c92a05
 ma.trailing.roll.week = rollmean(price.ts, k = 7, align = "right")
 ma.trailing.roll.month = rollmean(price.ts, k = 30, align = "right")
 
@@ -48,7 +58,7 @@ autoplot(price.ts,main='Airbnb Oakland Daily Pricing',
          xlab=("Time") , ylab=("Average listing price") )+
   autolayer(ma.trailing.roll.week,series='Weekly Aggregated')+
   autolayer(ma.trailing.roll.month,series='Monthly Aggregated')
-  
+
 ```
 
 1. Ask for advice on predicting daily v.s. monthly price of Oakland (monthly with very limited data points but does have monthly alternative data available)
@@ -90,12 +100,167 @@ Key findings
 (-) In 2020, the listing price drops in the beginning (potential reason: covid-19); however, starting from May, the price resumes and increases. 
 (-) Weekly seasonality is shown in the data. Since we only have two years data, it is hard to tell if there is a yearly seasonality. 
 
+Since we want to analyze the effect of Covid-19, we separate the data to pre-2020 and 2020-onwards, and separately construct models for each period. 
+
+```{r}
+# Separate the two periods
+pre_covid = window(price.ts, end = c(2018,534),frequency = 7)
+covid = window(price.ts, start = c(2018,535), frequency = 7)
+```
+
 (2.) Explore a variety of time-series models and determine the most appropriate candidate  model on the basis of accuracy and simplicity to analyze and forecast future prices. 
 
-(-) 
-```{r}
+For each pre- and post-covid period, we will set aside 1 week as validation set.
 
+```{r}
+nValid = 7
+pre_covid_train = window(pre_covid, end = c(2018,527),
+                         frequency = 7)
+pre_covid_valid = window(pre_covid, start = c(2018,528),
+                         frequency = 7)
 ```
+
+**Model 1 - Holt-Winters Exponential Smoothing**
+
+```{r}
+# Model for pre_covid
+pre_covid_hw = ets(pre_covid_train, model = "ZZZ")
+summary(pre_covid_hw)
+```
+
+HW parameter: Multiplicative error, dampened-additive trend, additive seasonality.
+Model shows MAPE of 0.5% on training data.
+
+```{r}
+## Plot of training data vs. fitted values
+autoplot(pre_covid_train)+
+  autolayer(pre_covid_hw$fitted)
+```
+
+```{r}
+## Predictions
+pre_covid_hw_pred = forecast(pre_covid_hw, h=7)
+
+## Check accuracy and residuals
+checkresiduals(pre_covid_hw_pred$residuals)
+accuracy(pre_covid_hw_pred, pre_covid_valid)
+
+## Plot of validation data vs. observed values
+autoplot(pre_covid_train) +
+  autolayer(pre_covid_valid, series = "Observed")+
+  autolayer(pre_covid_hw_pred, series = "Predicted", level = 0)
+
+autoplot(pre_covid_valid, series = "Observed")+
+  autolayer(pre_covid_hw_pred, series = "Predicted", level = 0)
+```
+
+MAPE of testing set is 0.22% and it's lower than training data. Assumptions not met since residuals show non-stationarity, ACF plot shows significance at lags of approx. 7, 14, and 21 which suggests autocorrelation at these lags. The residuals are not very normally distributed.
+
+Using this model to forecast 2020 first week would yield:
+
+```{r}
+hw_model = ets(pre_covid, model = "MAA", damped = TRUE)
+hw_model_pred = forecast(hw_model, h=7)
+hw_model_pred
+
+## Accuracy
+accuracy(hw_model_pred,covid[1:7])
+residual = hw_model_pred$mean- covid[1:7]
+residual
+
+## Plot
+autoplot(pre_covid)+
+  autolayer(hw_model_pred, series = "Predicted")
+```
+
+Using this model with the full pre-Covid data as training set, we see that MAPE increased from 0.5% (training set) to 2.54% (testing set), which is 5x the error on the training set. Therefore, although we only expect the prediction to differ from the actual value by 2.54% on average, this model is not a robust model.
+
+**We can also look at predictions for 1 month of data**
+
+```{r}
+## 1 day
+nValid = 30
+nTrain = length(pre_covid) - nValid
+pre_covid_train_2 = window(pre_covid, end = c(2018,nTrain),
+                         frequency = 7)
+pre_covid_valid_2 = window(pre_covid, start = c(2018,nTrain+1),
+                         frequency = 7)
+
+pre_covid_hw_2 = ets(pre_covid_train_2, model = "ZZZ")
+summary(pre_covid_hw_2) ## Same model as before (M, Ad, A)
+
+hw_model_2 = ets(pre_covid, model = "MAA", damped = TRUE)
+hw_model_pred_2 = forecast(hw_model_2, h= nValid)
+hw_model_pred_2
+
+## Accuracy
+accuracy(hw_model_pred_2,covid[1:30])
+residual = hw_model_pred_2$mean- covid[1:30]
+residual
+
+## Plot
+autoplot(pre_covid)+
+  autolayer(hw_model_pred_2, series = "Predicted", level = 0)+
+  autolayer(ts(covid[1:30], start = c(2018,535), frequency = 7), series = "Observed")
+```
+
+As shown in the plot, the prediction accuracy going into 2020 is very bad, likely due to the effect of Covid and its impact on tourism. Next, we should also look at other variables that affect the Airbnb price.
+
+**Separately construct a model for Covid period**
+
+```{r}
+## Plot
+autoplot(covid)
+```
+
+From the plot, there is again a weekly seasonality and a slight downward trend.
+
+```{r}
+# Model for post-covid
+nValid = 7
+nTrain = length(covid)-nValid
+covid_train = window(covid, end = c(2018,(length(pre_covid)+nTrain)),frequency = 7)
+covid_valid = window(covid, start = c(2018,(length(pre_covid)+nTrain+1)),
+                         frequency = 7)
+
+covid_hw = ets(covid_train, model = "ZZZ")
+summary(covid_hw)
+```
+
+New model to use for Covid period is M,N,M = multiplicative errors, no trend, multiplicative seasonality.
+
+```{r}
+## Plot of training data vs. fitted values
+autoplot(covid_train)+
+  autolayer(covid_hw$fitted)
+
+## Predictions
+covid_hw_pred = forecast(covid_hw, h=nValid)
+
+## Check accuracy and residuals
+checkresiduals(covid_hw_pred$residuals)
+accuracy(covid_hw_pred, pre_covid_valid)
+
+## Plot of validation data vs. observed values
+autoplot(covid_train)+
+  autolayer(covid_valid, series = "Observed") +
+  autolayer(covid_hw_pred, series = "Predicted", level = 0)
+```
+
+Model is fairly accurate on the validation set with MAPE of 0.22%, which is similar to the training set. However, assumptions are violated as residuals show varying stationarity and are not normally distributed.
+
+Using this model to predict the next week's price:
+
+```{r}
+hw_model_covid = ets(covid, model = "MNM")
+hw_model_pred_covid = forecast(hw_model_covid, h= nValid)
+hw_model_pred_covid
+
+## Plot
+autoplot(covid)+
+  autolayer(hw_model_pred_covid, series = "Predicted", level = 0)
+```
+
 
 (3.) Implement the selected candidate model to forecast both short-term and long-term Airbnb  average listing price in Oakland, California. 
 
