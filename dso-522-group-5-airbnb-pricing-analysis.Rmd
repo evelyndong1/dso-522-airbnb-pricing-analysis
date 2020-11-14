@@ -41,6 +41,14 @@ autoplot(price, xlab=("Time") , ylab=("Average listing price") )
 # load data in ts format 
 ## price.ts = ts(data$price, start = c(2018,197), frequency=7)
 price.ts = ts(data$price, start = c(2018,197), frequency=365)
+# function 1 
+price.1 = window(price.ts, end=c(2020, 13))
+nValid = 60
+price.1.train = window(price.1, end=c(2020, 13-nValid))
+price.1.test = window(price.1, start=c(2020, 13-nValid+1))
+# function 2
+price.2.train = window(price.ts, end=c(2020, 188-nValid))
+price.2.test = window(price.ts, start=c(2020, 188-nValid+1))
 ```
 
 ```{r}
