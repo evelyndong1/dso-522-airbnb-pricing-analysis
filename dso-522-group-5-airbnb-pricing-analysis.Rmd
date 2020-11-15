@@ -38,28 +38,6 @@ data = read.csv("cleaned_data.csv")
 price = zoo(data$price, seq(from = as.Date("2018-07-16"), to = as.Date("2020-07-16"), by = 1))
 # plot the data
 autoplot(price, xlab=("Time") , ylab=("Average listing price") )
-# load data in ts format 
-## price.ts = ts(data$price, start = c(2018,197), frequency=7)
-price.ts = ts(data$price, start = c(2018,197), frequency=365)
-# function 1 
-price.1 = window(price.ts, end=c(2020, 13))
-nValid = 60
-price.1.train = window(price.1, end=c(2020, 13-nValid))
-price.1.test = window(price.1, start=c(2020, 13-nValid+1))
-# function 2
-price.2.train = window(price.ts, end=c(2020, 188-nValid))
-price.2.test = window(price.ts, start=c(2020, 188-nValid+1))
-```
-
-```{r}
-# detect changing point 
-# changepoint detection methods: https://www.marinedatascience.co/blog/2019/09/28/comparison-of-change-point-detection-methods/
-
-library(changepoint)
-cpt.meanvar(price.ts, method = "AMOC")
-price.ts.subset = subset(price.ts, start=299)
-cpt.meanvar(price.ts.subset, method = "AMOC")
-data[547,]
 ```
 
 For example, data with daily observations might have a weekly seasonality (frequency=7) 
@@ -67,13 +45,11 @@ https://robjhyndman.com/hyndsight/seasonal-periods/
 
 <<<<<<< HEAD
 ```{r Loading Data in TS format}
-ma.trailing.roll.week = rollmean(price.ts, k = 7, align = "right")
-ma.trailing.roll.month = rollmean(price.ts, k = 30, align = "right")
+price.ts = ts(data$price, start = c(2018,1), frequency=7)
+
 # plot the data
 autoplot(price.ts,main='Airbnb Oakland Daily Pricing', 
-         xlab=("Time") , ylab=("Average listing price") )+
-  autolayer(ma.trailing.roll.week,series='Weekly Aggregated')+
-  autolayer(ma.trailing.roll.month,series='Monthly Aggregated')
+         xlab=("Time") , ylab=("Average listing price") )
 
 ```
 
@@ -88,18 +64,6 @@ Using alternative data that's not on the same level of details - extrapolation i
 By looking at the data we seee a sharper decrease in 2019 compare with COVID's impact:
 * Build the model without 2020, and then make predictions in 2020
 
-- Exponential Smoothing 
-```{r Smoothing}
-changeofprice = read.csv("Change_of_Price.csv")
-changeofprice <- ts(changeofprice$X..Change,start=c(2018,198),frequency=365)
-autoplot(changeofprice,main='Change of Price Lag 1',ylab='% of Change in Price')
-
-library(lmtest)
-#AR(1)
-ar1<-Arima(changeofprice,order=c(1,0,0))
-coeftest(ar1)
-```
-
 We see that the coefficient is far away from 0 and P value also did not show statistical significance, which means this is not a random walk.
 
 Key findings 
@@ -113,327 +77,186 @@ Since we want to analyze the effect of Covid-19, we separate the data to pre-202
 
 ```{r}
 # Separate the two periods
-pre_covid = window(price.ts, end = c(2018,534),frequency = 7)
-covid = window(price.ts, start = c(2018,535), frequency = 7)
+pre_covid = window(price.ts, end = c(2018,546),frequency = 7)
+covid = window(price.ts, start = c(2018,547), frequency = 7)
 ```
 
 (2.) Explore a variety of time-series models and determine the most appropriate candidate  model on the basis of accuracy and simplicity to analyze and forecast future prices. 
 
-For each pre- and post-covid period, we will set aside 1 week as validation set.
+**Holt-Winters Exponential Smoothing**
+
+--------------------------------------------------------------------
+--Function 1--
+--------------------------------------------------------------------
+
+We set aside 60 days as validation set.
+
 
 ```{r}
-nValid = 7
-pre_covid_train = window(pre_covid, end = c(2018,527),
+nValid1 = 60
+nTrain1 = length(pre_covid)-nValid1
+pre_covid_train = window(pre_covid, end = c(2018,nTrain1),
                          frequency = 7)
-pre_covid_valid = window(pre_covid, start = c(2018,528),
+pre_covid_valid = window(pre_covid, start = c(2018,(nTrain1+1)),
                          frequency = 7)
 ```
 
-**Model 1 - Holt-Winters Exponential Smoothing**
+
+Function 1 predictions
+Create a loop that repeated does 30 day forecasting pulling in one additional data at a time.
 
 ```{r}
-# Model for pre_covid
-pre_covid_hw = ets(pre_covid_train, model = "ZZZ")
-summary(pre_covid_hw)
+## Set validation days
+numValid = 30
+
+## Create empty vectors to store results
+hw1_pred = rep(NA,60)
+hw1_mape_train = rep(NA,numValid)
+hw1_mape_test = rep(NA, numValid)
+
+for(i in 1:numValid){
+
+  # Split the data into training and validation
+
+  nTrain = length(pre_covid_train) + i
+  train.ts = window(pre_covid, start = c(2018,1), end = c(2018, nTrain))
+
+  # Fit the HW MAdA model
+  hw1 = ets(train.ts, model = "ZZZ")
+
+  # Make prediction
+  pred = forecast(hw1, h=numValid)
+
+  # Store the MAPE (Testing MAPE is the 10th value)
+  hw1_mape_train[i] = summary(hw1)[5]
+  hw1_mape_test[i] = accuracy(pred$mean, pre_covid_valid[i:i+numValid])[5]
+  
+}
+
+# Average of the training and testing MAPE is the error of the model
+mean(hw1_mape_train)
+mean(hw1_mape_test)
+```
+
+The training error is 0.52%. The testing error is 1.52%. 
+
+
+Forecast the covid-period.
+
+```{r}
+# Train model for pre_covid
+## Latest model is hw1
+hw1
+pre_covid_hw = ets(pre_covid, model = "MAA", damped = TRUE)
 ```
 
 HW parameter: Multiplicative error, dampened-additive trend, additive seasonality.
-Model shows MAPE of 0.5% on training data.
+Model shows MAPE of 0.53% on training data.
 
 ```{r}
-## Plot of training data vs. fitted values
-autoplot(pre_covid_train)+
-  autolayer(pre_covid_hw$fitted)
-```
-
-```{r}
-## Predictions
-pre_covid_hw_pred = forecast(pre_covid_hw, h=7)
+## Forecast
+hw1_forecast = forecast(pre_covid_hw, h=length(covid))
+hw1_forecast
 
 ## Check accuracy and residuals
-checkresiduals(pre_covid_hw_pred$residuals)
-accuracy(pre_covid_hw_pred, pre_covid_valid)
+checkresiduals(hw1_forecast$residuals)
+accuracy(hw1_forecast, covid)
+
+error = abs(covid - hw1_forecast$mean)
+mean(error)
 
 ## Plot of validation data vs. observed values
-autoplot(pre_covid_train) +
-  autolayer(pre_covid_valid, series = "Observed")+
-  autolayer(pre_covid_hw_pred, series = "Predicted", level = 0)
-
-autoplot(pre_covid_valid, series = "Observed")+
-  autolayer(pre_covid_hw_pred, series = "Predicted", level = 0)
+autoplot(pre_covid) +
+  autolayer(covid, series = "Observed")+
+  autolayer(hw1_forecast, series = "Predicted", level = 0)
 ```
 
-MAPE of testing set is 0.22% and it's lower than training data. Assumptions not met since residuals show non-stationarity, ACF plot shows significance at lags of approx. 7, 14, and 21 which suggests autocorrelation at these lags. The residuals are not very normally distributed.
+MAPE of testing set is 2.94%, which is about 6 times the MAPE of the training set. Assumptions not met since residuals show non-stationarity, ACF plot shows significance at lags of approx. 5, 13, and 22 which suggests autocorrelation at these lags. The residuals are not very normally distributed. As shown in the plot, the model does not capture the decline in 2020 due to covid. On average, it's off by about _$3.48_. Given that in the year 2019, the price range is approx. between _$115_ and _$130_, a forecast error of about _$3.50_ is about 23% off from the actual value. 
 
-Using this model to forecast 2020 first week would yield:
 
-```{r}
-hw_model = ets(pre_covid, model = "MAA", damped = TRUE)
-hw_model_pred = forecast(hw_model, h=7)
-hw_model_pred
 
-## Accuracy
-accuracy(hw_model_pred,covid[1:7])
-residual = hw_model_pred$mean- covid[1:7]
-residual
+--------------------------------------------------------------------
+--Function 2--
+--------------------------------------------------------------------
 
-## Plot
-autoplot(pre_covid)+
-  autolayer(hw_model_pred, series = "Predicted")
-```
-
-Using this model with the full pre-Covid data as training set, we see that MAPE increased from 0.5% (training set) to 2.54% (testing set), which is 5x the error on the training set. Therefore, although we only expect the prediction to differ from the actual value by 2.54% on average, this model is not a robust model.
-
-**We can also look at predictions for 1 month of data**
+We set aside 60 days as validation set.
 
 ```{r}
-## 1 day
-nValid = 30
-nTrain = length(pre_covid) - nValid
-pre_covid_train_2 = window(pre_covid, end = c(2018,nTrain),
+nValid2 = 60
+nTrain2 = length(price.ts)-nValid2
+price_train = window(price.ts, end = c(2018,nTrain2),
                          frequency = 7)
-pre_covid_valid_2 = window(pre_covid, start = c(2018,nTrain+1),
+price_valid = window(price.ts, start = c(2018,(nTrain2+1)),
                          frequency = 7)
+```
 
-pre_covid_hw_2 = ets(pre_covid_train_2, model = "ZZZ")
-summary(pre_covid_hw_2) ## Same model as before (M, Ad, A)
+Model
 
-hw_model_2 = ets(pre_covid, model = "MAA", damped = TRUE)
-hw_model_pred_2 = forecast(hw_model_2, h= nValid)
-hw_model_pred_2
+```{r}
+## Set validation days
+numValid = 30
 
-## Accuracy
-accuracy(hw_model_pred_2,covid[1:30])
-residual = hw_model_pred_2$mean- covid[1:30]
-residual
+## Create empty vectors to store results
+hw2_mape_train = rep(NA,numValid)
+hw2_mape_test = rep(NA, numValid)
+
+for(i in 1:numValid){
+
+  # Split the data into training and validation
+
+  nTrain = length(price_train) + i
+  train.ts = window(price.ts, start = c(2018,1), end = c(2018, nTrain))
+
+  # Fit the HW MAdA model
+  hw2 = ets(train.ts, model = "ZZZ")
+
+  # Make prediction
+  pred = forecast(hw2, h=numValid)
+
+  # Store the MAPE (Testing MAPE is the 10th value)
+  hw2_mape_train[i] = summary(hw2)[5]
+  hw2_mape_test[i] = accuracy(pred$mean, price_valid[i:i+numValid])[5]
+  
+}
+
+# Average of the training and testing MAPE is the error of the model
+mean(hw2_mape_train)
+mean(hw2_mape_test)
+```
+
+The training error is 0.68%. The testing error is 1.97%. 
+
+Forecast the covid-period.
+
+```{r}
+# Train model for pre_covid
+## Latest model is hw2
+hw2
+
+## Residuals
+checkresiduals(hw2$residuals)
+
+```
+
+The HW model has Multiplicative errors, an additive, damped trend, and multiplicative seasonality.
+
+
+Using this model with parts of Covid data as training set, the training MAPE is 0.68% while the testing MAPE is 1.97%, which about than 3x the training error. Therefore, although we only expect the prediction to differ from the actual value by 2.21% on average, this model is not a robust model. The assumptions are also validated as residuals suffer from non-stationarity and autocorrelation.
+
+Forecast for the month of August
+
+```{r}
+## Construct model
+covid_hw = ets(price.ts, model = "MAM", damped = TRUE)
+
+## Forecast
+hw2_forecast = forecast(covid_hw, h=30)
+hw2_forecast
 
 ## Plot
-autoplot(pre_covid)+
-  autolayer(hw_model_pred_2, series = "Predicted", level = 0)+
-  autolayer(ts(covid[1:30], start = c(2018,535), frequency = 7), series = "Observed")
+autoplot(price.ts)+
+  autolayer(hw2_forecast, series = "Forecasted Aug. Price", level = 0)
 ```
-
-As shown in the plot, the prediction accuracy going into 2020 is very bad, likely due to the effect of Covid and its impact on tourism. Next, we should also look at other variables that affect the Airbnb price.
-
-**Separately construct a model for Covid period**
-
-```{r}
-## Plot
-autoplot(covid)
-```
-
-From the plot, there is again a weekly seasonality and a slight downward trend.
-
-```{r}
-# Model for post-covid
-nValid = 7
-nTrain = length(covid)-nValid
-covid_train = window(covid, end = c(2018,(length(pre_covid)+nTrain)),frequency = 7)
-covid_valid = window(covid, start = c(2018,(length(pre_covid)+nTrain+1)),
-                         frequency = 7)
-
-covid_hw = ets(covid_train, model = "ZZZ")
-summary(covid_hw)
-```
-
-New model to use for Covid period is M,N,M = multiplicative errors, no trend, multiplicative seasonality.
-
-```{r}
-## Plot of training data vs. fitted values
-autoplot(covid_train)+
-  autolayer(covid_hw$fitted)
-
-## Predictions
-covid_hw_pred = forecast(covid_hw, h=nValid)
-
-## Check accuracy and residuals
-checkresiduals(covid_hw_pred$residuals)
-accuracy(covid_hw_pred, pre_covid_valid)
-
-## Plot of validation data vs. observed values
-autoplot(covid_train)+
-  autolayer(covid_valid, series = "Observed") +
-  autolayer(covid_hw_pred, series = "Predicted", level = 0)
-```
-
-Model is fairly accurate on the validation set with MAPE of 0.22%, which is similar to the training set. However, assumptions are violated as residuals show varying stationarity and are not normally distributed.
-
-Using this model to predict the next week's price:
-
-```{r}
-hw_model_covid = ets(covid, model = "MNM")
-hw_model_pred_covid = forecast(hw_model_covid, h= nValid)
-hw_model_pred_covid
-
-## Plot
-autoplot(covid)+
-  autolayer(hw_model_pred_covid, series = "Predicted", level = 0)
-```
-
-**Model 2 - ARIMA**
-
-- ARIMA
-Clearly there is a trend in the time series, which makes the time series non-stationary. As a result, we take a first-order differencing and check ACF and PACF graphs. 
-```{r}
-# check detrended price
-price.detrend = diff(price.ts, lag = 1)
-autoplot(price.detrend)
-par(mfrow=c(1,2)) 
-Acf(price.detrend, 150) 
-Pacf(price.detrend, 150)
-par(mfrow=c(1,1)) 
-```
-From the ACF and PACF graphs of detrended data, we can see the PACF graph cuts off and ACF graph slowly tails off. However, since the ACF graph has spikes in seasonal lags and doesn't converge to 0, this suggests a weekly seasonality pattern in the data. These also appear to be non-stationary, so we take an additional weekly difference. 
-
-```{r}
-# check detrended and deseasoned price 
-price.detrend.deseason = diff(diff(price.ts, lag = 1), lag=7)
-autoplot(price.detrend.deseason)
-par(mfrow=c(1,2)) 
-Acf(price.detrend.deseason, 150) 
-Pacf(price.detrend.deseason, 150)
-par(mfrow=c(1,1)) 
-```
-Our aim now is to find an appropriate ARIMA model baseds on the ACF and PACF graph show agove. The significant spike at lag 1 and no significant spikes immediately followed after lag 1 in the ACF suggests a non-seasonal MA(1) component, and the signiifcant spike at lag 7 in the ACF suggests a seasonal MA(1) component. Consequently, we begin with a SARIMA(0,1,1)(0,1,1)[7] model, indicating a first and seasonal difference, and non-seasonal and seasonal MA(1) components.
-
-By analogous logic applied to the PACF, there is a significant spike in lag 1, followed by an almost significant spike at lag 2, which doesn't indicate a non-seasonal AR term that we are interested in. The significant pike at lag 7 in the PACF suggest a seasonal AR(1) component. As a result, we could have another SARIMA(0,1,0)(1,1,0)[7] model. 
-
-By combining the AR and MA terms together, we could have a third SARIMA(0,1,1)(1,1,1)[7] model, and a fourth SARIMA(1,1,1)(1,1,1) to validate our assumption about the AR term. 
-
-Finally, we try an AutoArima model to search over possible models.
-
-(1) SARIMA(0,1,1)(0,1,1)[7]
-```{r}
-arima1 = Arima(price.ts, order=c(0,1,1), seasonal = list(order=c(0,1,1), period=7))
-summary(arima1)
-```
-(2) SARIMA(0,1,0)(1,1,0)[7]
-```{r}
-arima2 = Arima(price.ts, order=c(0,1,0), seasonal = list(order=c(1,1,0), period=7))
-summary(arima2)
-```
-
-(3) SARIMA(0,1,0)(1,1,1)[7]
-```{r}
-arima3 = Arima(price.ts, order=c(0,1,0), seasonal = list(order=c(1,1,1), period=7))
-summary(arima3)
-```
-
-(4) SARIMA(1,1,1)(1,1,1)[7]
-```{r}
-arima4 = Arima(price.ts, order=c(1,1,1), seasonal = list(order=c(1,1,1), period=7))
-summary(arima4)
-```
-
-(5) Auto ARIMA
-```{r}
-arima5 = auto.arima(price.ts, seasonal=TRUE, approximation = FALSE)
-summary(arima5)
-```
-
-Based on the MAPE values, the best model is the third model - SARIMA(0,1,0)(1,1,1)[7]. However, it still gives a high MAPE value of 0.6184103, which indicates the predicted sales is 0.62% off the target (pretty accurate for in-sample data). By checking residuals, we find the model doesn't fit well for time before 2019 and after covid-19. As a result, our next step is to 1) partition the data into three parts and fit models accordingly 2) partition into training and validation set to check model robustness. 
-
-(Why Auto-Arima doesn't work: https://stackoverflow.com/questions/52976059/auto-arima-in-r-error-no-seasonal-differencing-is-selected)
-```{r}
-mape(price.ts, m3$fitted)
-```
-
-```{r}
-autoplot(price.ts)+autolayer(m3$fitted)
-checkresiduals(m3)
-```
-**Model 3 - Neural Network Autoregression Model**
-
-```{r}
-price.ts = ts(data$price, start = c(2018,197), frequency=365)
-library(xts)
-library(readxl)
-pre.covid<-window(price.ts,start=c(2018,197),end=c(2019,365),frequency=365)
-post.covid<-window(price.ts,start=c(2020,1),frequency=365)
-nValid=197
-GDP<-read_xlsx("GDP.xlsm")
-gdp.xts <- xts(GDP$GDP,order.by=as.Date(GDP$DATE))
-gdp.daily<-na.locf(merge(gdp.xts, foo=zoo(NA, order.by=seq(start(gdp.xts), end(gdp.xts),
-  "day",drop=F)))[, 1])
-gdp.xreg<-gdp.daily[16:549,1]
-gdp.valid<-rep(last(gdp.xreg),nValid)
-ur<-read.csv("unemployment_rate.csv")
-ur.xts <- xts(ur$UNRATE,order.by=as.Date(ur$DATE))
-ur.daily<-na.locf(merge(ur.xts, foo=zoo(NA, order.by=seq(start(ur.xts), end(ur.xts),
-  "day",drop=F)))[, 1])
-ur.xreg<-ur.daily[16:549,1]
-ur.valid<-rep(last(ur.xreg),nValid)
-```
-
-```{r}
-# Model 1 original NNAR
-set.seed(100)
-m1<-nnetar(pre.covid)
-m1.pred<-forecast(m1,h=nValid)
-accuracy(m1.pred,post.covid)
-```
-
-```{r}
-autoplot(m1.pred)+autolayer(post.covid)+autolayer(m1$fitted)
-```
-
-```{r}
-## Model 2 NNAR with exogenous variable-GDP
-m2<-nnetar(pre.covid,xreg = as.matrix(gdp.xreg$gdp.xts))
-m2.pred<-forecast(m2,h=nValid,xreg=as.matrix(gdp.valid))
-accuracy(m2.pred,post.covid)
-```
-
-```{r}
-autoplot(m2.pred)+autolayer(post.covid)+autolayer(m2$fitted)
-```
-
-```{r}
-## Model 3 NNAR with exogenous variable-ur
-m3<-nnetar(pre.covid,xreg = as.matrix(ur.xreg$ur.xts))
-m3.pred<-forecast(m3,h=nValid,xreg=as.matrix(ur.valid))
-accuracy(m3.pred,post.covid)
-```
-
-```{r}
-autoplot(m3.pred)+autolayer(post.covid)+autolayer(m3$fitted)
-```
-
-```{r}
-## Model 4 NNAR with both of ur & GDP variables
-a<-cbind(ur.xreg$ur.xts,gdp.xreg$gdp.xts)
-
-m4<-nnetar(pre.covid,xreg=as.matrix(a))
-
-m4.pred<-forecast(m4,h=nValid,xreg=as.matrix(cbind(ur.valid,gdp.valid)))
-accuracy(m4.pred,post.covid)
-```
-
-```{r}
-autoplot(m4.pred)+autolayer(post.covid)+autolayer(m4$fitted)
-```
-
-```{r}
-library(forecast)
-par(mfrow=c(1,2))
-Acf(pre.covid)
-Pacf(pre.covid)
-```
-ACF tails off as a damped wave pattern, Pacf cuts off at lag 36.
-AR(36) p=36, P=1, k=15
-
-```{r}
-# Model 5 p=36,P=1 NNAR
-m5<-nnetar(pre.covid,p=36,P=1,repeats = 15)
-m5.pred<-forecast(m5,h=nValid)
-accuracy(m5.pred,post.covid)
-```
-
-```{r}
-autoplot(m5.pred)+autolayer(post.covid)+autolayer(m5$fitted)
-```
-M5 is overfitting. 
-M3 is the best NNAR model.
 
 
 (3.) Implement the selected candidate model to forecast both short-term and long-term Airbnb  average listing price in Oakland, California. 
