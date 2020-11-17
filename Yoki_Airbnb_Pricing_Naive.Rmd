@@ -1,0 +1,127 @@
+---
+title: "DSO 522 Group 5 Airbnb Pricing Analysis"
+author: "Group 5 (Evelyn (Wanyi) Dong, Qiongqiong Lin, Jenny Shang, Yoki (Lingrou) Wang) "
+date: "11/1/2020"
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+header-includes: \usepackage{color}
+editor_options: 
+  chunk_output_type: console
+---
+
+\begin{center} 
+{\color{red} \textbf{DSO 522 Group 5 Airbnb Pricing Analysis}}
+\end{center}
+
+For this project, we want to study the impact of Covid-19 on the tourism industry by
+analyzing past price trends of Airbnb rental properties in the city of Oakland, California, and predict future rental prices by applying different time-series forecasting methods. We choose this topic because Airbnb rentals have seen significant growth in the past but are now struggling from booking declines due to Covid-19. We are interested in using time-series forecasting to predict future prices and provide valuable insights and recommendations to help Airbnb’s stakeholders develop a solid pricing strategy to achieve customer retention and sustainable growth. From a technical standpoint, Airbnb data is readily available on Airbnb’s official website (http://insideairbnb.com/get-the-data.html). It is pre-processed, well-structured and standardized, making it the ideal dataset to conduct our analysis.
+
+The complete dataset represents 722 Oakland average daily Airbnb house pricing from July 16, 2018 to July 16, 2020. 
+
+## Our analysis is built on three key objectives: 
+(1.) Understand the historical patterns of the Airbnb data by studying potential trends and  periodic components. 
+
+```{r}
+# import packages
+library(zoo)
+library(forecast)
+library(ggplot2)
+library(dplyr)
+```
+
+```{r}
+# read data
+data = read.csv("cleaned_data.csv")
+# set zoo object of price
+price = zoo(data$price, seq(from = as.Date("2018-07-16"), to = as.Date("2020-07-16"), by = 1))
+# plot the data
+autoplot(price, xlab=("Time") , ylab=("Average listing price") )
+# load data in ts format 
+## price.ts = ts(data$price, start = c(2018,197), frequency=7)
+price.ts = ts(data$price, start = c(2018,197), frequency=365)
+# function 1 
+price.1 = window(price.ts, end=c(2020, 13))
+nValid = 60
+price.1.train = window(price.1, end=c(2020, 13-nValid))
+price.1.test = window(price.1, start=c(2020, 13-nValid+1))
+# function 2
+price.2.train = window(price.ts, end=c(2020, 188-nValid))
+price.2.test = window(price.ts, start=c(2020, 188-nValid+1))
+```
+
+
+
+```{r Functin1}
+## Set validation days
+numValid = 30
+
+## Create empty vectors to store results
+naive_pred = rep(NA,60)
+snaive_mape_train = rep(NA,numValid)
+snaive_mape_test = rep(NA, numValid)
+```
+
+
+```{r}
+for(i in 1:numValid){
+
+  # Split the data into training and validation
+
+  nTrain = length(price.1.train) + i
+  train.ts = window(price.1, start = c(2018,197), end = c(2018, 197+nTrain-1))
+
+  # Fit the Seasonal Naive Model
+  naive_1step<-snaive(train.ts,h=numValid)
+
+  # Make prediction
+  pred = forecast(naive_1step, h=numValid)
+
+  # Store the MAPE (Testing MAPE is the 10th value)
+  snaive_mape_train[i] = accuracy(naive_1step)[5]
+  snaive_mape_test[i] = accuracy(pred$mean,price.1.test[i:(i+numValid-1)])[5]
+  
+}
+
+# Average of the training and testing MAPE is the error of the model
+mean(snaive_mape_train)
+mean(snaive_mape_test)
+```
+
+
+```{r Functin2}
+## Set validation days
+numValid = 30
+
+## Create empty vectors to store results
+naive_pred = rep(NA,60)
+snaive_mape_train = rep(NA,numValid)
+snaive_mape_test = rep(NA, numValid)
+```
+
+```{r}
+for(i in 1:numValid){
+
+  # Split the data into training and validation
+
+  nTrain = length(price.2.train) + i
+  train.ts = window(price.ts, start = c(2018,197), end = c(2018, 197+nTrain-1))
+
+  # Fit the Seasonal Naive Model
+  naive_1step<-snaive(train.ts,h=numValid)
+
+  # Make prediction
+  pred = forecast(naive_1step, h=numValid)
+
+  # Store the MAPE (Testing MAPE is the 10th value)
+  snaive_mape_train[i] = accuracy(naive_1step)[5]
+  snaive_mape_test[i] = accuracy(pred$mean,price.2.test[i:(i+numValid-1)])[5]
+  
+}
+
+# Average of the training and testing MAPE is the error of the model
+mean(snaive_mape_train)
+mean(snaive_mape_test)
+```
+
