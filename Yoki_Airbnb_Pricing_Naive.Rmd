@@ -90,6 +90,13 @@ mean(snaive_mape_test)
 ```
 
 
+
+
+
+
+
+
+
 ```{r Functin2}
 ## Set validation days
 numValid = 30
@@ -125,3 +132,17 @@ mean(snaive_mape_train)
 mean(snaive_mape_test)
 ```
 
+
+
+```{r Function_1_Prediction}
+func_1_naive_1step<-snaive(price.1,h=numValid)
+pred.func_1_naive_1step<-forecast(func_1_naive_1step,h=numValid)
+
+func_2_naive_1step<-snaive(price.ts,h=numValid)
+pred.func_2_naive_1step<-forecast(func_2_naive_1step,h=numValid)
+
+autoplot(price.1,series='Actual',main='Pre-Covid Model Result')+autolayer(pred.func_1_naive_1step,series='Function 1 Forecast')
+
+autoplot(price.ts,series='Actual',main='All Data (Including Some Covid) Result')+autolayer(pred.func_2_naive_1step,series='Function 2 Forecast')
+
+```
