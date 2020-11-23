@@ -37,7 +37,7 @@ data = read.csv("cleaned_data.csv")
 # set zoo object of price
 price = zoo(data$price, seq(from = as.Date("2018-07-16"), to = as.Date("2020-07-16"), by = 1))
 # plot the data
-autoplot(price, xlab=("Time") , ylab=("Average listing price") )
+autoplot(price, xlab=("Time"), ylab=("Average listing price"))
 ```
 
 For example, data with daily observations might have a weekly seasonality (frequency=7) 
@@ -141,6 +141,8 @@ numValid = 30
 ## Create empty vectors to store results
 arima1_mape_train = rep(NA,numValid)
 arima1_mape_test = rep(NA, numValid)
+arima1_rmse_train = rep(NA,numValid)
+arima1_rmse_test = rep(NA, numValid)
 
 for(i in 1:numValid){
 
@@ -159,21 +161,37 @@ for(i in 1:numValid){
   arima1_mape_train[i] = summary(arima1)[5]
   arima1_mape_test[i] = accuracy(pred$mean, pre_covid_valid[i:i+numValid])[5]
   
+  arima1_rmse_train[i] = summary(arima1)[2]
+  arima1_rmse_test[i] = accuracy(pred$mean, pre_covid_valid[i:i+numValid])[2]
 }
 
 # Average of the training and testing MAPE is the error of the model
+mean(arima1_rmse_train)
+mean(arima1_rmse_test)
 mean(arima1_mape_train)
 mean(arima1_mape_test)
 ```
 
-The training error is 0.54%. The testing error is 1.51%. 
+```{r}
+pre_covid_arima = Arima(pre_covid, order=c(0,1,1), seasonal = list(order=c(0,1,1), period=7))
+pre_covid_arima_forecast = forecast(pre_covid_arima, h=length(covid))
+autoplot(pre_covid, main = "Observed v.s. Predicted Using Pre-covid data") +
+  autolayer(covid, series = "Observed")+
+  autolayer(pre_covid_arima_forecast, series = "Predicted", level=0)+
+  ylim(100, 140)
+```
 
 
 (2) SARIMA(0,1,0)(1,1,0)[7]
 ```{r}
+## Set validation days
+numValid = 30
+
 ## Create empty vectors to store results
 arima2_mape_train = rep(NA,numValid)
 arima2_mape_test = rep(NA, numValid)
+arima2_rmse_train = rep(NA,numValid)
+arima2_rmse_test = rep(NA, numValid)
 
 for(i in 1:numValid){
 
@@ -182,7 +200,7 @@ for(i in 1:numValid){
   nTrain = length(pre_covid_train) + i
   train.ts = window(pre_covid, end = c(2018, nTrain+196))
 
-  # Fit the SARIMA(0,1,0)(1,1,0)[7] model
+  # Fit the SARIMA(0,1,1)(0,1,1)[7] model
   arima2 = Arima(train.ts, order=c(0,1,0), seasonal = list(order=c(1,1,0), period=7))
 
   # Make prediction
@@ -192,20 +210,38 @@ for(i in 1:numValid){
   arima2_mape_train[i] = summary(arima2)[5]
   arima2_mape_test[i] = accuracy(pred$mean, pre_covid_valid[i:i+numValid])[5]
   
+  arima2_rmse_train[i] = summary(arima2)[2]
+  arima2_rmse_test[i] = accuracy(pred$mean, pre_covid_valid[i:i+numValid])[2]
 }
 
 # Average of the training and testing MAPE is the error of the model
+mean(arima2_rmse_train)
+mean(arima2_rmse_test)
 mean(arima2_mape_train)
 mean(arima2_mape_test)
+```
+
+```{r}
+pre_covid_arima = Arima(pre_covid, order=c(0,1,0), seasonal = list(order=c(1,1,0), period=7))
+pre_covid_arima_forecast = forecast(pre_covid_arima, h=length(covid))
+autoplot(pre_covid, main = "Observed v.s. Predicted Using Pre-covid data") +
+  autolayer(covid, series = "Observed")+
+  autolayer(pre_covid_arima_forecast, series = "Predicted", level=0)+
+  ylim(100, 140)
 ```
 
 The training error is 0.62%. The testing error is 1.46%. 
 
 (3) SARIMA(0,1,0)(1,1,1)[7]
 ```{r}
+## Set validation days
+numValid = 30
+
 ## Create empty vectors to store results
 arima3_mape_train = rep(NA,numValid)
 arima3_mape_test = rep(NA, numValid)
+arima3_rmse_train = rep(NA,numValid)
+arima3_rmse_test = rep(NA, numValid)
 
 for(i in 1:numValid){
 
@@ -214,31 +250,50 @@ for(i in 1:numValid){
   nTrain = length(pre_covid_train) + i
   train.ts = window(pre_covid, end = c(2018, nTrain+196))
 
-  # Fit the SARIMA(0,1,0)(1,1,1)[7] model
+  # Fit the SARIMA(0,1,1)(0,1,1)[7] model
   arima3 = Arima(train.ts, order=c(0,1,0), seasonal = list(order=c(1,1,1), period=7))
 
   # Make prediction
-  pred = forecast(arima3, h=numValid)
+  pred = forecast(arima1, h=numValid)
 
   # Store the MAPE (Testing MAPE is the 10th value)
   arima3_mape_train[i] = summary(arima3)[5]
   arima3_mape_test[i] = accuracy(pred$mean, pre_covid_valid[i:i+numValid])[5]
   
+  arima3_rmse_train[i] = summary(arima3)[2]
+  arima3_rmse_test[i] = accuracy(pred$mean, pre_covid_valid[i:i+numValid])[2]
 }
 
 # Average of the training and testing MAPE is the error of the model
+mean(arima3_rmse_train)
+mean(arima3_rmse_test)
 mean(arima3_mape_train)
 mean(arima3_mape_test)
 ```
+
+```{r}
+pre_covid_arima = Arima(pre_covid, order=c(0,1,0), seasonal = list(order=c(1,1,1), period=7))
+pre_covid_arima_forecast = forecast(pre_covid_arima, h=length(covid))
+autoplot(pre_covid, main = "Observed v.s. Predicted Using Pre-covid data") +
+  autolayer(covid, series = "Observed")+
+  autolayer(pre_covid_arima_forecast, series = "Predicted", level=0)+
+  ylim(100, 140)
+```
+
 
 The training error is 0.54%. The testing error is 1.52%. 
 
 
 (4) SARIMA(1,1,1)(1,1,1)[7]
 ```{r}
+## Set validation days
+numValid = 30
+
 ## Create empty vectors to store results
 arima4_mape_train = rep(NA,numValid)
 arima4_mape_test = rep(NA, numValid)
+arima4_rmse_train = rep(NA,numValid)
+arima4_rmse_test = rep(NA, numValid)
 
 for(i in 1:numValid){
 
@@ -247,21 +302,34 @@ for(i in 1:numValid){
   nTrain = length(pre_covid_train) + i
   train.ts = window(pre_covid, end = c(2018, nTrain+196))
 
-  # Fit the SARIMA(1,1,1)(1,1,1)[7] model
+  # Fit the SARIMA(0,1,1)(0,1,1)[7] model
   arima4 = Arima(train.ts, order=c(1,1,1), seasonal = list(order=c(1,1,1), period=7))
 
   # Make prediction
-  pred = forecast(arima4, h=numValid)
+  pred = forecast(arima1, h=numValid)
 
   # Store the MAPE (Testing MAPE is the 10th value)
   arima4_mape_train[i] = summary(arima4)[5]
   arima4_mape_test[i] = accuracy(pred$mean, pre_covid_valid[i:i+numValid])[5]
   
+  arima4_rmse_train[i] = summary(arima4)[2]
+  arima4_rmse_test[i] = accuracy(pred$mean, pre_covid_valid[i:i+numValid])[2]
 }
 
 # Average of the training and testing MAPE is the error of the model
+mean(arima4_rmse_train)
+mean(arima4_rmse_test)
 mean(arima4_mape_train)
 mean(arima4_mape_test)
+```
+
+```{r}
+pre_covid_arima = Arima(pre_covid, order=c(1,1,1), seasonal = list(order=c(1,1,1), period=7))
+pre_covid_arima_forecast = forecast(pre_covid_arima, h=length(covid))
+autoplot(pre_covid, main = "Observed v.s. Predicted Using Pre-covid data") +
+  autolayer(covid, series = "Observed")+
+  autolayer(pre_covid_arima_forecast, series = "Predicted", level=0)+
+  ylim(100, 140)
 ```
 
 The training error is 0.54%. The testing error is 1.51%. 
@@ -310,11 +378,8 @@ Forecast the covid-period with (2) SARIMA(0,1,0)(1,1,0)[7] since it gives the la
 ```{r}
 # Train model for pre_covid
 ## Latest model is hw1
-pre_covid_arima = Arima(pre_covid, order=c(0,1,0), seasonal = list(order=c(1,1,0), period=7))
+pre_covid_arima = Arima(pre_covid, order=c(0,1,1), seasonal = list(order=c(0,1,1), period=7))
 ```
-
-HW parameter: Multiplicative error, dampened-additive trend, additive seasonality.
-Model shows MAPE of 0.53% on training data.
 
 ```{r}
 ## Forecast
@@ -331,7 +396,7 @@ mean(error)
 ## Plot of validation data vs. observed values
 autoplot(pre_covid) +
   autolayer(covid, series = "Observed")+
-  autolayer(pre_covid_arima_forecast, series = "Predicted", level=0)+
+  autolayer(pre_covid_arima_forecast, series = "Predicted")+
   ylim(100, 140)
 ```
 
@@ -352,6 +417,7 @@ price_valid = window(price.ts, start = c(2018,(nTrain2+197)),
                          frequency = 365)
 ```
 
+
 (1) SARIMA(0,1,1)(0,1,1)[7]
 ```{r}
 ## Set validation days
@@ -360,6 +426,8 @@ numValid = 30
 ## Create empty vectors to store results
 arima1_mape_train = rep(NA,numValid)
 arima1_mape_test = rep(NA, numValid)
+arima1_rmse_train = rep(NA,numValid)
+arima1_rmse_test = rep(NA, numValid)
 
 for(i in 1:numValid){
 
@@ -378,21 +446,41 @@ for(i in 1:numValid){
   arima1_mape_train[i] = summary(arima1)[5]
   arima1_mape_test[i] = accuracy(pred$mean, price_valid[i:i+numValid])[5]
   
+  arima1_rmse_train[i] = summary(arima1)[2]
+  arima1_rmse_test[i] = accuracy(pred$mean, price_valid[i:i+numValid])[2]
 }
 
 # Average of the training and testing MAPE is the error of the model
+mean(arima1_rmse_train)
+mean(arima1_rmse_test)
 mean(arima1_mape_train)
 mean(arima1_mape_test)
 ```
 
-The training error is 0.64%. The testing error is 2.16%. 
+```{r}
+## Construct the model
+covid_arima = Arima(price.ts, order=c(0,1,1), seasonal = list(order=c(0,1,1), period=7))
+
+## Forecast
+covid_arima_forecast = forecast(covid_arima, h=30)
+covid_arima_forecast
+
+## Plot
+autoplot(price.ts, main="Forecasted Aug. Price")+
+  autolayer(covid_arima_forecast, series = "Forecasted Aug. Price")
+```
 
 
 (2) SARIMA(0,1,0)(1,1,0)[7]
 ```{r}
+## Set validation days
+numValid = 30
+
 ## Create empty vectors to store results
 arima2_mape_train = rep(NA,numValid)
 arima2_mape_test = rep(NA, numValid)
+arima2_rmse_train = rep(NA,numValid)
+arima2_rmse_test = rep(NA, numValid)
 
 for(i in 1:numValid){
 
@@ -401,7 +489,7 @@ for(i in 1:numValid){
   nTrain = length(price_train) + i
   train.ts = window(price.ts, end = c(2018, nTrain+196))
 
-  # Fit the SARIMA(0,1,0)(1,1,0)[7] model
+  # Fit the SARIMA(0,1,1)(0,1,1)[7] model
   arima2 = Arima(train.ts, order=c(0,1,0), seasonal = list(order=c(1,1,0), period=7))
 
   # Make prediction
@@ -411,20 +499,40 @@ for(i in 1:numValid){
   arima2_mape_train[i] = summary(arima2)[5]
   arima2_mape_test[i] = accuracy(pred$mean, price_valid[i:i+numValid])[5]
   
+  arima2_rmse_train[i] = summary(arima2)[2]
+  arima2_rmse_test[i] = accuracy(pred$mean, price_valid[i:i+numValid])[2]
 }
 
 # Average of the training and testing MAPE is the error of the model
+mean(arima2_rmse_train)
+mean(arima2_rmse_test)
 mean(arima2_mape_train)
 mean(arima2_mape_test)
 ```
 
-The training error is 0.67%. The testing error is 2.19%. 
+```{r}
+## Construct the model
+covid_arima = Arima(price.ts, order=c(0,1,0), seasonal = list(order=c(1,1,0), period=7))
+
+## Forecast
+covid_arima_forecast = forecast(covid_arima, h=30)
+covid_arima_forecast
+
+## Plot
+autoplot(price.ts, main="Forecasted Aug. Price")+
+  autolayer(covid_arima_forecast, series = "Forecasted Aug. Price")
+```
 
 (3) SARIMA(0,1,0)(1,1,1)[7]
 ```{r}
+## Set validation days
+numValid = 30
+
 ## Create empty vectors to store results
 arima3_mape_train = rep(NA,numValid)
 arima3_mape_test = rep(NA, numValid)
+arima3_rmse_train = rep(NA,numValid)
+arima3_rmse_test = rep(NA, numValid)
 
 for(i in 1:numValid){
 
@@ -433,31 +541,52 @@ for(i in 1:numValid){
   nTrain = length(price_train) + i
   train.ts = window(price.ts, end = c(2018, nTrain+196))
 
-  # Fit the SARIMA(0,1,0)(1,1,1)[7] model
+  # Fit the SARIMA(0,1,1)(0,1,1)[7] model
   arima3 = Arima(train.ts, order=c(0,1,0), seasonal = list(order=c(1,1,1), period=7))
 
   # Make prediction
-  pred = forecast(arima3, h=numValid)
+  pred = forecast(arima1, h=numValid)
 
   # Store the MAPE (Testing MAPE is the 10th value)
   arima3_mape_train[i] = summary(arima3)[5]
   arima3_mape_test[i] = accuracy(pred$mean, price_valid[i:i+numValid])[5]
   
+  arima3_rmse_train[i] = summary(arima3)[2]
+  arima3_rmse_test[i] = accuracy(pred$mean, price_valid[i:i+numValid])[2]
 }
 
 # Average of the training and testing MAPE is the error of the model
+mean(arima3_rmse_train)
+mean(arima3_rmse_test)
 mean(arima3_mape_train)
 mean(arima3_mape_test)
 ```
 
-The training error is 0.61%. The testing error is 2.24%. 
+```{r}
+## Construct the model
+covid_arima = Arima(price.ts, order=c(0,1,0), seasonal = list(order=c(1,1,1), period=7))
+
+## Forecast
+covid_arima_forecast = forecast(covid_arima, h=30)
+covid_arima_forecast
+
+## Plot
+autoplot(price.ts, main="Forecasted Aug. Price")+
+  autolayer(covid_arima_forecast, series = "Forecasted Aug. Price")
+```
+
 
 
 (4) SARIMA(1,1,1)(1,1,1)[7]
 ```{r}
+## Set validation days
+numValid = 30
+
 ## Create empty vectors to store results
 arima4_mape_train = rep(NA,numValid)
 arima4_mape_test = rep(NA, numValid)
+arima4_rmse_train = rep(NA,numValid)
+arima4_rmse_test = rep(NA, numValid)
 
 for(i in 1:numValid){
 
@@ -466,24 +595,43 @@ for(i in 1:numValid){
   nTrain = length(price_train) + i
   train.ts = window(price.ts, end = c(2018, nTrain+196))
 
-  # Fit the SARIMA(1,1,1)(1,1,1)[7] model
+  # Fit the SARIMA(0,1,1)(0,1,1)[7] model
   arima4 = Arima(train.ts, order=c(1,1,1), seasonal = list(order=c(1,1,1), period=7))
 
   # Make prediction
-  pred = forecast(arima4, h=numValid)
+  pred = forecast(arima1, h=numValid)
 
   # Store the MAPE (Testing MAPE is the 10th value)
   arima4_mape_train[i] = summary(arima4)[5]
   arima4_mape_test[i] = accuracy(pred$mean, price_valid[i:i+numValid])[5]
   
+  arima4_rmse_train[i] = summary(arima4)[2]
+  arima4_rmse_test[i] = accuracy(pred$mean, price_valid[i:i+numValid])[2]
 }
 
 # Average of the training and testing MAPE is the error of the model
+mean(arima4_rmse_train)
+mean(arima4_rmse_test)
 mean(arima4_mape_train)
 mean(arima4_mape_test)
 ```
 
-The training error is 0.62%. The testing error is 2.28%. 
+```{r}
+## Construct the model
+covid_arima = Arima(price.ts, order=c(1,1,1), seasonal = list(order=c(1,1,1), period=7))
+
+## Forecast
+covid_arima_forecast = forecast(covid_arima, h=30)
+covid_arima_forecast
+
+## Plot
+autoplot(price.ts, main="Forecasted Aug. Price")+
+  autolayer(covid_arima_forecast, series = "Forecasted Aug. Price")
+```
+
+```{r}
+checkresiduals(covid_arima)
+```
 
 (5) Auto-ARIMA
 
@@ -523,48 +671,4 @@ mean(arima5_mape_test)
 ```
 
 The training error is 0.88%. The testing error is 2.15%. 
-
-Forecast the covid-period using the model (1) SARIMA(0,1,1)(0,1,1)[7]. 
-
-```{r}
-# Train model for pre_covid
-## Latest model is hw2
-arima1
-
-## Residuals
-checkresiduals(arima1$residuals)
-
-```
-
-Forecast for the month of August
-
-```{r}
-## Construct the model
-covid_arima = Arima(price.ts, order=c(0,1,1), seasonal = list(order=c(0,1,1), period=7))
-
-## Forecast
-covid_arima_forecast = forecast(covid_arima, h=30)
-covid_arima_forecast
-
-## Plot
-autoplot(price.ts)+
-  autolayer(covid_arima_forecast, series = "Forecasted Aug. Price", level = 0)
-```
-
-
-(3.) Implement the selected candidate model to forecast both short-term and long-term Airbnb  average listing price in Oakland, California. 
-
-## With our objectives in mind, we strive to deliver to Airbnb stakeholders a guidance on listing  price. Our analysis will focus on answering four important questions: 
-
-(1.) What are the  determinative factors of average listing prices? 
-
-(2.) Are there any lags between Covid-19 outbreak  and rental prices? 
-
-(3.) Have vacation rentals recovered from the pandemic? 
-
-(4.) Are there any  important external factors that play a role in determining the average listing price? In the future, we can apply our analysis to broader geographic areas. 
-
-Some important variables in our study include the overall average listing price of the  selected city, and the average listing price per room type (entire home/apt or private room).  Additional variables we want to consider include the city’s unemployment rate over time, which  can be found on the U.S. Bureau of Labor Statistics website (https://www.bls.gov), as well as  general economic indicators such as GDP growth, which can be obtained from St. Louis Fed  (https://fred.stlouisfed.org/). 
-
-At the end of our study, we expect to draw critical insights from historical patterns in  order to assist Airbnb’s stakeholders. We aim to provide Airbnb hosts with an understanding of  the determinative factors affecting property listing price such that they can adjust ahead of time,  suggest an accurate, simple and effective time-series forecasting model for Airbnb to predict  average short-term rental pricing and long-term rental pricing, and explore potential solutions for  Airbnb to identify risks and launch effective promotion or recovery plans in this Covid-19 era.
 
